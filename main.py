@@ -1,12 +1,12 @@
 import os
-import time
 import json
 import logging
-import requests
 import pandas as pd
 from dotenv import load_dotenv
 
 from get_access import get_access_key
+
+from utils import get_response
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -48,26 +48,6 @@ def get_tracks_from_albums(album_id, access_token):
             break
     return tracks
 
-def handle_rate_limiting(response):
-    retry_after = int(response.headers.get('Retry-After', 1))
-    logging.warning(f"Rate limited. Retrying after {retry_after} seconds.")
-    time.sleep(retry_after)
-
-def get_response(url, headers):
-    global access_token
-    while True: 
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 429: 
-            handle_rate_limiting(response)
-        elif response.status_code == 401: 
-            get_access_key()
-            access_token = os.getenv('ACCESS_TOKEN')
-        else:
-            error_msg = f"Error {response.status_code}: {response.text}"
-            logging.error(error_msg)
-            raise Exception(error_msg)
 
 def get_featured_playlists(access_token, limit=50, offset=0):
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -125,7 +105,7 @@ def main():
     
     with open('q.json', 'r') as f:
         queries = json.load(f)
-        
+
     for ex in [True, False]:
         for query in queries if not ex else [None]:
             for offset in range(0, 100, 50):
@@ -142,9 +122,10 @@ def main():
         all_tracks = get_tracks_from_albums(album_id, access_token)
         all_ids.extend(all_tracks)
 
+    file_name = 'track_ids_2.csv'
     df = pd.DataFrame({'track_id': all_ids})
-    df.to_csv('track_ids_2.csv', index=False)
-    logging.info(f"Saved {len(df)} tracks to 'track_ids.csv'")
+    df.to_csv(file_name, index=False)
+    logging.info(f"Saved {len(df)} tracks to {file_name}")
 
 if __name__ == "__main__":
     main()
